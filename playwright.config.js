@@ -6,6 +6,7 @@ module.exports = defineConfig({
     browserName: 'chromium',
     headless: true,
     baseURL: 'http://localhost:3000',
+    video: 'on',
   },
   webServer: {
     command: 'npm start',
