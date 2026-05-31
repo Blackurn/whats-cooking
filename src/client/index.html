@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recipe Generator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Recipe Generator</h1>
+  </header>
+
+  <main>
+    <section class="panel panel-input">
+      <label for="ingredients">Ingredients</label>
+      <textarea
+        id="ingredients"
+        placeholder="e.g. tomatoes, pasta, garlic, olive oil"
+        rows="8"
+      ></textarea>
+
+      <div class="serves-row">
+        <label for="serves">Serves</label>
+        <input id="serves" type="number" value="2" min="1" max="20" />
+      </div>
+
+      <button id="generate-btn">Generate Recipe</button>
+    </section>
+
+    <section class="panel panel-output">
+      <div id="recipe-output"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

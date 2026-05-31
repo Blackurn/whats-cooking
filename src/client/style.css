@@ -1,0 +1,110 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #f5f5f0;
+  color: #1a1a1a;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: #2c2c2c;
+  color: #fff;
+  padding: 1rem 1.5rem;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+main {
+  display: flex;
+  flex: 1;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid #e0e0d8;
+}
+
+.panel-input {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel-output {
+  flex: 1;
+}
+
+label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #555;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid #d0d0c8;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  background: #fafaf7;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #888;
+}
+
+.serves-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.serves-row input {
+  width: 64px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d0d0c8;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+button {
+  padding: 0.6rem 1rem;
+  background: #2c2c2c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+button:hover {
+  background: #444;
+}
+
+#recipe-output {
+  min-height: 200px;
+  color: #777;
+  font-size: 0.9rem;
+}
