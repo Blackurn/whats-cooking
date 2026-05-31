@@ -64,7 +64,7 @@ export interface CodexConfig {
   command: string;
   approvalPolicy: string | null;
   threadSandbox: string | null;
-  turnSandboxPolicy: string | null;
+  turnSandboxPolicy: string | Record<string, unknown> | null;
   turnTimeoutMs: number;
   readTimeoutMs: number;
   stallTimeoutMs: number;

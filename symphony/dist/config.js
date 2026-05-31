@@ -173,11 +173,12 @@ function parseAgent(raw) {
 }
 function parseCodex(raw) {
     const c = raw ?? {};
+    const turnSandboxRaw = c['turn_sandbox_policy'];
     return {
         command: str(c['command']) ?? DEFAULT_CODEX_COMMAND,
         approvalPolicy: str(c['approval_policy']) ?? null,
         threadSandbox: str(c['thread_sandbox']) ?? null,
-        turnSandboxPolicy: str(c['turn_sandbox_policy']) ?? null,
+        turnSandboxPolicy: str(turnSandboxRaw) ?? obj(turnSandboxRaw) ?? null,
         turnTimeoutMs: num(c['turn_timeout_ms']) ?? DEFAULT_TURN_TIMEOUT_MS,
         readTimeoutMs: num(c['read_timeout_ms']) ?? DEFAULT_READ_TIMEOUT_MS,
         stallTimeoutMs: num(c['stall_timeout_ms']) ?? DEFAULT_STALL_TIMEOUT_MS,

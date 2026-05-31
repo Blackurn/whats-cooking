@@ -140,15 +140,39 @@ function buildTurnStartRequest(
   issueTitle: string,
   config: ServiceConfig,
 ): CodexRequest {
+  const sandboxPolicy = resolveTurnSandboxPolicy(config.codex.turnSandboxPolicy, workspacePath);
   return {
     method: 'turn/start',
     params: {
       threadId,
       cwd: workspacePath,
       input: userInput(input),
-      ...(config.codex.turnSandboxPolicy ? { sandboxPolicy: config.codex.turnSandboxPolicy } : {}),
+      ...(sandboxPolicy ? { sandboxPolicy } : {}),
     },
   };
+}
+
+function resolveTurnSandboxPolicy(
+  policy: ServiceConfig['codex']['turnSandboxPolicy'],
+  workspacePath: string,
+): Record<string, unknown> | null {
+  if (!policy) return null;
+  if (typeof policy === 'object') return policy;
+
+  switch (policy) {
+    case 'workspace-write':
+      return {
+        type: 'workspaceWrite',
+        writableRoots: [workspacePath],
+        networkAccess: false,
+      };
+    case 'read-only':
+      return { type: 'readOnly', networkAccess: false };
+    case 'danger-full-access':
+      return { type: 'dangerFullAccess' };
+    default:
+      return { type: policy };
+  }
 }
 
 // --- CodexProcess — wraps subprocess I/O ---
