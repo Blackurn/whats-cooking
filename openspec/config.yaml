@@ -1,20 +1,54 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Project: What's Cooking — a local AI-powered recipe generator web app.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Tech stack:
+    - Frontend: plain HTML/CSS/JS (vanilla, no build step at foundation; React to be introduced for first component-heavy feature)
+    - Backend: Node.js + Express (CommonJS modules)
+    - AI: Ollama (local LLM, no external API calls) — models: tinyllama, phi3.5
+    - Tests: Playwright (E2E integration tests, not yet set up)
+    - CI/CD: GitHub Actions (not yet set up)
+    - Dev environment: Dev Container / Docker (not yet set up)
+
+  Architecture:
+    - Single Express process on port 3000 serves both the API (/api/*) and static client files
+    - Streaming responses use Server-Sent Events (EventSource on the client)
+    - No build step — Express serves src/client/ directly
+    - All AI inference is local via Ollama on port 11434
+
+  Folder structure:
+    src/server/index.js              — Express entry point
+    src/server/routes/recipe.js      — POST /api/recipe
+    src/server/routes/rewrite.js     — POST /api/rewrite
+    src/server/routes/substitute.js  — POST /api/substitute
+    src/client/index.html            — app shell
+    src/client/app.js                — vanilla JS UI logic
+    src/client/style.css             — styles
+
+  Conventions:
+    - Route files are one-file-per-endpoint under src/server/routes/
+    - No comments unless the WHY is non-obvious
+    - No TypeScript — plain JS throughout
+    - package.json type: commonjs (require/module.exports)
+    - npm start → node src/server/index.js
+
+  Domain:
+    - Users enter ingredients they have on hand
+    - App generates a full recipe (name, ingredients with quantities, step-by-step method)
+    - Recipe can be rewritten for dietary needs (vegan, gluten-free, dairy-free)
+    - Individual ingredients can be substituted in context
+    - Serving size rescales all quantities
+    - Recipe history stored in localStorage
+
+rules:
+  proposal:
+    - Scope to web/server/client layers only — no mobile, no cloud hosting
+    - Defer React migration until a feature genuinely requires component state
+    - Keep proposals under one page; implementation details belong in design.md
+  design:
+    - Note when a decision deviates from the CAPABILITIES.md spec and why
+    - Call out any new npm dependencies explicitly
+  tasks:
+    - Keep each task completable in one focused session
+    - Verification tasks (npm start, curl, browser check) must be the final group
