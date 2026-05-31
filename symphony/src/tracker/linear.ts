@@ -19,8 +19,9 @@ const ISSUE_FIELDS = `
   branchName
   url
   labels { nodes { name } }
-  inverseRelations(filter: { type: { eq: "blocks" } }) {
+  inverseRelations {
     nodes {
+      type
       issue {
         id
         identifier
@@ -134,7 +135,7 @@ async function graphqlRequest(
 interface RawState { name?: unknown }
 interface RawLabel { name?: unknown }
 interface RawBlockerIssue { id?: unknown; identifier?: unknown; state?: RawState }
-interface RawInverseRelation { issue?: RawBlockerIssue }
+interface RawInverseRelation { issue?: RawBlockerIssue; type?: unknown }
 interface RawIssue {
   id?: unknown;
   identifier?: unknown;
@@ -166,11 +167,13 @@ function normalizeIssue(raw: RawIssue): Issue | null {
     .filter((l) => typeof l.name === 'string')
     .map((l) => (l.name as string).toLowerCase());
 
-  const blockedBy: BlockerRef[] = (raw.inverseRelations?.nodes ?? []).map((rel) => ({
-    id: typeof rel.issue?.id === 'string' ? rel.issue.id : null,
-    identifier: typeof rel.issue?.identifier === 'string' ? rel.issue.identifier : null,
-    state: typeof rel.issue?.state?.name === 'string' ? rel.issue.state.name : null,
-  }));
+  const blockedBy: BlockerRef[] = (raw.inverseRelations?.nodes ?? [])
+    .filter((rel) => typeof rel.type !== 'string' || rel.type.toLowerCase() === 'blocks')
+    .map((rel) => ({
+      id: typeof rel.issue?.id === 'string' ? rel.issue.id : null,
+      identifier: typeof rel.issue?.identifier === 'string' ? rel.issue.identifier : null,
+      state: typeof rel.issue?.state?.name === 'string' ? rel.issue.state.name : null,
+    }));
 
   const parseDate = (v: unknown): Date | null => {
     if (typeof v === 'string') {

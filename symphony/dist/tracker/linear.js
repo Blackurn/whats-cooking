@@ -17,8 +17,9 @@ const ISSUE_FIELDS = `
   branchName
   url
   labels { nodes { name } }
-  inverseRelations(filter: { type: { eq: "blocks" } }) {
+  inverseRelations {
     nodes {
+      type
       issue {
         id
         identifier
@@ -123,7 +124,9 @@ function normalizeIssue(raw) {
     const labels = (raw.labels?.nodes ?? [])
         .filter((l) => typeof l.name === 'string')
         .map((l) => l.name.toLowerCase());
-    const blockedBy = (raw.inverseRelations?.nodes ?? []).map((rel) => ({
+    const blockedBy = (raw.inverseRelations?.nodes ?? [])
+        .filter((rel) => typeof rel.type !== 'string' || rel.type.toLowerCase() === 'blocks')
+        .map((rel) => ({
         id: typeof rel.issue?.id === 'string' ? rel.issue.id : null,
         identifier: typeof rel.issue?.identifier === 'string' ? rel.issue.identifier : null,
         state: typeof rel.issue?.state?.name === 'string' ? rel.issue.state.name : null,
