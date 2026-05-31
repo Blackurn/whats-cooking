@@ -24,6 +24,9 @@ function buildDashboardHtml(snap: ReturnType<Orchestrator['snapshot']>): string 
       <td>${escapeHtml(r.state)}</td>
       <td>${r.attempt ?? 0}</td>
       <td>${r.turnCount}</td>
+      <td>${escapeHtml(r.lastEvent ?? '-')}</td>
+      <td>${escapeHtml(r.lastMessage ?? '-')}</td>
+      <td>${escapeHtml(r.workspacePath)}</td>
       <td>${escapeHtml(r.sessionId ?? '-')}</td>
       <td>${new Date(r.startedAt).toISOString()}</td>
     </tr>`,
@@ -35,6 +38,15 @@ function buildDashboardHtml(snap: ReturnType<Orchestrator['snapshot']>): string 
       <td>${r.attempt}</td>
       <td>${new Date(r.dueAtMs).toISOString()}</td>
       <td>${escapeHtml(r.error ?? '-')}</td>
+    </tr>`,
+  ).join('\n');
+
+  const eventRows = snap.recentEvents.slice(0, 25).map((e) =>
+    `<tr>
+      <td>${escapeHtml(e.at)}</td>
+      <td>${escapeHtml(e.identifier)}</td>
+      <td>${escapeHtml(e.event)}</td>
+      <td>${escapeHtml(e.message ?? e.error ?? '-')}</td>
     </tr>`,
   ).join('\n');
 
@@ -63,18 +75,23 @@ function buildDashboardHtml(snap: ReturnType<Orchestrator['snapshot']>): string 
   &nbsp;|&nbsp;
   <strong>Runtime:</strong> ${snap.codexTotals.secondsRunning.toFixed(1)}s
 </div>
-<h2>Running (${snap.running.length})</h2>
+	<h2>Running (${snap.running.length})</h2>
+	<table>
+	  <thead><tr><th>Issue</th><th>State</th><th>Attempt</th><th>Turns</th><th>Last Event</th><th>Last Message</th><th>Workspace</th><th>Session</th><th>Started</th></tr></thead>
+	  <tbody>${runningRows || '<tr><td colspan="9">-</td></tr>'}</tbody>
+	</table>
+	<h2>Retrying (${snap.retrying.length})</h2>
 <table>
-  <thead><tr><th>Issue</th><th>State</th><th>Attempt</th><th>Turns</th><th>Session</th><th>Started</th></tr></thead>
-  <tbody>${runningRows || '<tr><td colspan="6">-</td></tr>'}</tbody>
-</table>
-<h2>Retrying (${snap.retrying.length})</h2>
-<table>
-  <thead><tr><th>Issue</th><th>Attempt</th><th>Due</th><th>Error</th></tr></thead>
-  <tbody>${retryRows || '<tr><td colspan="4">-</td></tr>'}</tbody>
-</table>
-</body>
-</html>`;
+	  <thead><tr><th>Issue</th><th>Attempt</th><th>Due</th><th>Error</th></tr></thead>
+	  <tbody>${retryRows || '<tr><td colspan="4">-</td></tr>'}</tbody>
+	</table>
+	<h2>Recent Events (${snap.recentEvents.length})</h2>
+	<table>
+	  <thead><tr><th>At</th><th>Issue</th><th>Event</th><th>Message</th></tr></thead>
+	  <tbody>${eventRows || '<tr><td colspan="4">-</td></tr>'}</tbody>
+	</table>
+	</body>
+	</html>`;
 }
 
 export function startHttpServer(
@@ -102,6 +119,7 @@ export function startHttpServer(
     const snap = orchestrator.snapshot();
     const runEntry = snap.running.find((r) => r.identifier === identifier);
     const retryEntry = snap.retrying.find((r) => r.identifier === identifier);
+    const recentEvents = snap.recentEvents.filter((e) => e.identifier === identifier);
     if (!runEntry && !retryEntry) {
       res.status(404).json({
         error: {
@@ -111,7 +129,12 @@ export function startHttpServer(
       });
       return;
     }
-    res.json({ identifier, running: runEntry ?? null, retrying: retryEntry ?? null });
+    res.json({
+      identifier,
+      running: runEntry ?? null,
+      retrying: retryEntry ?? null,
+      recentEvents,
+    });
   });
 
   // POST /api/v1/refresh — trigger immediate poll

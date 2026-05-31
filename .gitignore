@@ -2,5 +2,6 @@ node_modules/
 test-results/
 WORKFLOW.local.md
 .symphony/
+symphony/dist/*
 .env
 .envrc

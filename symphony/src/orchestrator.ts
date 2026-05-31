@@ -14,12 +14,24 @@ import { loadWorkflow, WorkflowWatcher, resolveWorkflowPath } from './workflow';
 import { parseConfig, validateConfig, ensureWorkspaceRoot } from './config';
 import { createTracker } from './tracker/index';
 import { TrackerClient } from './types';
-import { WorkspaceManager } from './workspace';
+import { computeWorkspacePath, WorkspaceManager } from './workspace';
 import { runAgent } from './runner';
 import { SymphonyError } from './errors';
 import { logger } from './logger';
 
 const CONTINUATION_RETRY_DELAY_MS = 1_000;
+const RECENT_EVENT_LIMIT = 200;
+
+interface RecentEvent {
+  at: string;
+  issueId: string;
+  identifier: string;
+  event: string;
+  threadId: string | null;
+  turnId: string | null;
+  message: string | null;
+  error: string | null;
+}
 
 // --- Backoff formula (Section 8.4) ---
 function calcRetryDelay(attempt: number, isFailure: boolean, maxBackoffMs: number): number {
@@ -58,6 +70,7 @@ export class Orchestrator {
   private listeners: OrchestratorListener[] = [];
   private workflowPath: string;
   private endedSessionSeconds = 0;
+  private recentEvents: RecentEvent[] = [];
 
   constructor(workflowPath?: string) {
     this.workflowPath = resolveWorkflowPath(workflowPath);
@@ -81,6 +94,57 @@ export class Orchestrator {
     for (const l of this.listeners) {
       try { l(type, data); } catch { /* ignore */ }
     }
+  }
+
+  private summarizeEvent(event: AgentEvent): string | null {
+    if (event.error) return event.error;
+    const payload = event.payload;
+    if (!payload) return null;
+
+    const params = payload['params'];
+    const result = payload['result'];
+    const target = typeof params === 'object' && params !== null
+      ? params as Record<string, unknown>
+      : typeof result === 'object' && result !== null
+        ? result as Record<string, unknown>
+        : payload;
+
+    for (const key of ['message', 'text', 'delta', 'summary']) {
+      const value = target[key];
+      if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 500);
+    }
+
+    const turn = target['turn'];
+    if (typeof turn === 'object' && turn !== null) {
+      const status = (turn as Record<string, unknown>)['status'];
+      if (typeof status === 'string') return `turn status: ${status}`;
+    }
+
+    try {
+      return JSON.stringify(target).slice(0, 500);
+    } catch {
+      return null;
+    }
+  }
+
+  private recordEvent(issue: Issue, event: AgentEvent): string | null {
+    const message = this.summarizeEvent(event);
+    this.recentEvents.push({
+      at: event.timestamp.toISOString(),
+      issueId: issue.id,
+      identifier: issue.identifier,
+      event: event.event,
+      threadId: event.threadId ?? null,
+      turnId: event.turnId ?? null,
+      message,
+      error: event.error ?? null,
+    });
+
+    if (this.recentEvents.length > RECENT_EVENT_LIMIT) {
+      this.recentEvents.splice(0, this.recentEvents.length - RECENT_EVENT_LIMIT);
+    }
+
+    return message;
   }
 
   getState(): OrchestratorRuntimeState {
@@ -396,7 +460,7 @@ export class Orchestrator {
     const entry: RunningEntry = {
       issue,
       attempt,
-      workspacePath: '',
+      workspacePath: computeWorkspacePath(config.workspace.root, issue.identifier),
       startedAt,
       session: null,
       abort: () => controller.abort(),
@@ -430,6 +494,7 @@ export class Orchestrator {
       onEvent: (event: AgentEvent) => {
         const entry = this.state.running.get(issue.id);
         if (!entry) return;
+        const message = this.recordEvent(issue, event);
 
         // Update session on the running entry from event data
         if (event.threadId && event.turnId) {
@@ -451,6 +516,7 @@ export class Orchestrator {
           };
           entry.session.lastCodexEvent = event.event;
           entry.session.lastCodexTimestamp = event.timestamp;
+          entry.session.lastCodexMessage = message;
           if (typeof event.payload?.['turnCount'] === 'number') {
             entry.session.turnCount = event.payload['turnCount'];
           }
@@ -590,15 +656,19 @@ export class Orchestrator {
 
   // Snapshot for HTTP API / status surface (Section 13.3)
   snapshot(): {
-    running: Array<{
-      issueId: string;
-      identifier: string;
-      state: string;
-      attempt: number | null;
-      startedAt: string;
-      sessionId: string | null;
-      turnCount: number;
-    }>;
+	    running: Array<{
+	      issueId: string;
+	      identifier: string;
+	      state: string;
+	      attempt: number | null;
+	      workspacePath: string;
+	      startedAt: string;
+	      sessionId: string | null;
+	      turnCount: number;
+	      lastEvent: string | null;
+	      lastMessage: string | null;
+	      lastEventAt: string | null;
+	    }>;
     retrying: Array<{
       issueId: string;
       identifier: string;
@@ -606,9 +676,10 @@ export class Orchestrator {
       dueAtMs: number;
       error: string | null;
     }>;
-    codexTotals: { inputTokens: number; outputTokens: number; totalTokens: number; secondsRunning: number };
-    rateLimits: Record<string, unknown> | null;
-  } {
+	    codexTotals: { inputTokens: number; outputTokens: number; totalTokens: number; secondsRunning: number };
+	    rateLimits: Record<string, unknown> | null;
+	    recentEvents: RecentEvent[];
+	  } {
     const now = Date.now();
     const activeSeconds = [...this.state.running.values()].reduce(
       (acc, e) => acc + (now - e.startedAt.getTime()) / 1000,
@@ -619,12 +690,16 @@ export class Orchestrator {
       running: [...this.state.running.entries()].map(([id, e]) => ({
         issueId: id,
         identifier: e.issue.identifier,
-        state: e.issue.state,
-        attempt: e.attempt,
-        startedAt: e.startedAt.toISOString(),
-        sessionId: e.session?.sessionId ?? null,
-        turnCount: e.session?.turnCount ?? 0,
-      })),
+	        state: e.issue.state,
+	        attempt: e.attempt,
+	        workspacePath: e.workspacePath,
+	        startedAt: e.startedAt.toISOString(),
+	        sessionId: e.session?.sessionId ?? null,
+	        turnCount: e.session?.turnCount ?? 0,
+	        lastEvent: e.session?.lastCodexEvent ?? null,
+	        lastMessage: e.session?.lastCodexMessage ?? null,
+	        lastEventAt: e.session?.lastCodexTimestamp?.toISOString() ?? null,
+	      })),
       retrying: [...this.state.retryAttempts.values()].map((r) => ({
         issueId: r.issueId,
         identifier: r.identifier,
@@ -636,9 +711,10 @@ export class Orchestrator {
         ...this.state.codexTotals,
         secondsRunning: this.endedSessionSeconds + activeSeconds,
       },
-      rateLimits: this.state.codexRateLimits,
-    };
-  }
+	      rateLimits: this.state.codexRateLimits,
+	      recentEvents: [...this.recentEvents].reverse(),
+	    };
+	  }
 
   triggerImmediatePoll(): void {
     if (this.pollTimer) clearTimeout(this.pollTimer);
